@@ -107,11 +107,46 @@ function update() {
 
     //score
     context.fillStyle = "white";
-    context.font="45px sans-serif";
-    context.fillText(score, 5, 45);
+    context.font="bold 32px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 3;
+    
+    // Draw score label
+    context.strokeText("SCORE", 10, 35);
+    context.fillText("SCORE", 10, 35);
+    
+    // Draw score value with larger font
+    context.font="bold 48px Arial";
+    context.strokeText(score, 10, 80);
+    context.fillText(score, 10, 80);
 
     if (gameOver) {
-        context.fillText("GAME OVER", 5, 90);
+        // Game over text with better positioning
+        context.font="bold 36px Arial";
+        let gameOverText = "GAME OVER";
+        let textWidth = context.measureText(gameOverText).width;
+        let x = (boardWidth - textWidth) / 2;
+        
+        context.strokeText(gameOverText, x, boardHeight/2 - 50);
+        context.fillText(gameOverText, x, boardHeight/2 - 50);
+        
+        // Restart instruction
+        context.font="bold 20px Arial";
+        let restartText = "TAP TO RESTART";
+        let restartWidth = context.measureText(restartText).width;
+        let restartX = (boardWidth - restartWidth) / 2;
+        
+        context.strokeText(restartText, restartX, boardHeight/2);
+        context.fillText(restartText, restartX, boardHeight/2);
+        
+        // Final score display
+        context.font="bold 24px Arial";
+        let finalScoreText = "FINAL SCORE: " + score;
+        let finalScoreWidth = context.measureText(finalScoreText).width;
+        let finalScoreX = (boardWidth - finalScoreWidth) / 2;
+        
+        context.strokeText(finalScoreText, finalScoreX, boardHeight/2 + 40);
+        context.fillText(finalScoreText, finalScoreX, boardHeight/2 + 40);
     }
 }
 
