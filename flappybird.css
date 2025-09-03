@@ -6,4 +6,6 @@ body {
 #board {
     /* background-color: skyblue; */
     background-image: url("./flappybirdbg.png");
+    touch-action: none; /* Prevent scrolling and zooming on touch */
+    user-select: none; /* Prevent text selection */
 }

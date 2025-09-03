@@ -63,6 +63,8 @@ window.onload = function() {
     requestAnimationFrame(update);
     setInterval(placePipes, 1500); //every 1.5 seconds
     document.addEventListener("keydown", moveBird);
+    document.addEventListener("touchstart", moveBird);
+    document.addEventListener("click", moveBird);
 }
 
 function update() {
@@ -146,7 +148,7 @@ function placePipes() {
 }
 
 function moveBird(e) {
-    if (e.code == "Space" || e.code == "ArrowUp" || e.code == "KeyX") {
+    if (e.code == "Space" || e.code == "ArrowUp" || e.code == "KeyX" || e.type == "touchstart" || e.type == "click") {
         //jump
         velocityY = -6;
 
@@ -157,6 +159,11 @@ function moveBird(e) {
             score = 0;
             gameOver = false;
         }
+    }
+    
+    // Prevent default behavior for touch events to avoid scrolling
+    if (e.type == "touchstart") {
+        e.preventDefault();
     }
 }
 
