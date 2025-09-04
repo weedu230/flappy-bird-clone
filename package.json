@@ -4,9 +4,9 @@
   "description": "A Flappy Bird clone game built with HTML5 Canvas",
   "main": "index.html",
   "scripts": {
-    "dev": "python3 -m http.server 3000",
+    "dev": "npx --yes serve -s . -l 3000",
     "build": "echo 'No build step needed for static HTML game'",
-    "preview": "python3 -m http.server 4173"
+    "preview": "npx --yes serve -s . -l 4173"
   },
   "keywords": ["flappy-bird", "game", "html5", "canvas"],
   "author": "",
