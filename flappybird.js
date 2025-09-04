@@ -37,6 +37,9 @@ let gravity = 0.4;
 let gameOver = false;
 let score = 0;
 
+//audio
+let bgMusic;
+
 window.onload = function() {
     board = document.getElementById("board");
     board.height = boardHeight;
@@ -59,6 +62,12 @@ window.onload = function() {
 
     bottomPipeImg = new Image();
     bottomPipeImg.src = "./bottompipe.png";
+
+    //load background music
+    bgMusic = new Audio();
+    bgMusic.src = "./bgm_mario.mp3";
+    bgMusic.loop = true;
+    bgMusic.volume = 0.3; //set volume to 30%
 
     requestAnimationFrame(update);
     setInterval(placePipes, 1500); //every 1.5 seconds
@@ -184,6 +193,11 @@ function placePipes() {
 
 function moveBird(e) {
     if (e.code == "Space" || e.code == "ArrowUp" || e.code == "KeyX" || e.type == "touchstart" || e.type == "click") {
+        //start music on first interaction (required by browsers)
+        if (bgMusic.paused) {
+            bgMusic.play().catch(e => console.log("Audio play failed:", e));
+        }
+        
         //jump
         velocityY = -6;
 
@@ -193,6 +207,9 @@ function moveBird(e) {
             pipeArray = [];
             score = 0;
             gameOver = false;
+            //restart music
+            bgMusic.currentTime = 0;
+            bgMusic.play().catch(e => console.log("Audio play failed:", e));
         }
     }
     
