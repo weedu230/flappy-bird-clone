@@ -36,6 +36,7 @@ let gravity = 0.4;
 let gameOver = false;
 let score = 0;
 let showNameInput = false;
+let showHighScores = false;
 let playerName = "";
 let highScores = [];
 
@@ -106,6 +107,10 @@ function update() {
     requestAnimationFrame(update);
     if (gameOver && showNameInput) {
         drawNameInputScreen();
+        return;
+    }
+    if (gameOver && showHighScores) {
+        drawHighScoresScreen();
         return;
     }
     if (gameOver) {
@@ -215,6 +220,43 @@ function drawNameInputScreen() {
     context.fillText(instructText, instructX, boardHeight/2 + 80);
 }
 
+function drawHighScoresScreen() {
+    context.clearRect(0, 0, board.width, board.height);
+    
+    // Semi-transparent overlay
+    context.fillStyle = "rgba(0, 0, 0, 0.8)";
+    context.fillRect(0, 0, boardWidth, boardHeight);
+    
+    // Title
+    context.fillStyle = "white";
+    context.font = "bold 28px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 2;
+    let titleText = "HIGH SCORES";
+    let titleWidth = context.measureText(titleText).width;
+    let titleX = (boardWidth - titleWidth) / 2;
+    context.strokeText(titleText, titleX, boardHeight/2 - 120);
+    context.fillText(titleText, titleX, boardHeight/2 - 120);
+    
+    // Display high scores
+    context.font = "20px Arial";
+    for (let i = 0; i < Math.min(8, highScores.length); i++) {
+        let scoreEntry = `${i + 1}. ${highScores[i].name}: ${highScores[i].score}`;
+        let entryWidth = context.measureText(scoreEntry).width;
+        let entryX = (boardWidth - entryWidth) / 2;
+        context.strokeText(scoreEntry, entryX, boardHeight/2 - 80 + (i * 30));
+        context.fillText(scoreEntry, entryX, boardHeight/2 - 80 + (i * 30));
+    }
+    
+    // Instructions
+    context.font = "18px Arial";
+    context.fillStyle = "yellow";
+    let instructText = "TAP TO PLAY AGAIN";
+    let instructWidth = context.measureText(instructText).width;
+    let instructX = (boardWidth - instructWidth) / 2;
+    context.fillText(instructText, instructX, boardHeight/2 + 120);
+}
+
 function drawGameOverScreen() {
     context.clearRect(0, 0, board.width, board.height);
     
@@ -247,27 +289,6 @@ function drawGameOverScreen() {
     
     context.strokeText(restartText, restartX, boardHeight/2);
     context.fillText(restartText, restartX, boardHeight/2);
-    
-    // Display high scores
-    if (highScores.length > 0) {
-        context.fillStyle = "white";
-        context.font = "bold 20px Arial";
-        
-        let highScoreTitle = "HIGH SCORES";
-        let titleWidth = context.measureText(highScoreTitle).width;
-        let titleX = (boardWidth - titleWidth) / 2;
-        context.strokeText(highScoreTitle, titleX, boardHeight/2 + 60);
-        context.fillText(highScoreTitle, titleX, boardHeight/2 + 60);
-        
-        context.font = "16px Arial";
-        for (let i = 0; i < Math.min(5, highScores.length); i++) {
-            let scoreEntry = `${i + 1}. ${highScores[i].name}: ${highScores[i].score}`;
-            let entryWidth = context.measureText(scoreEntry).width;
-            let entryX = (boardWidth - entryWidth) / 2;
-            context.strokeText(scoreEntry, entryX, boardHeight/2 + 90 + (i * 25));
-            context.fillText(scoreEntry, entryX, boardHeight/2 + 90 + (i * 25));
-        }
-    }
 }
 
 function placePipes() {
@@ -306,8 +327,9 @@ function moveBird(e) {
             if (e.code === "Enter" || e.key === "Enter") {
                 if (playerName.trim() !== "") {
                     addHighScore(playerName.trim(), score);
-                    showNameInput = false;
                     playerName = "";
+                    showNameInput = false;
+                    showHighScores = true;
                 }
             } else if (e.code === "Backspace" || e.key === "Backspace") {
                 playerName = playerName.slice(0, -1);
@@ -317,6 +339,14 @@ function moveBird(e) {
                     playerName += e.key;
                 }
             }
+        }
+        return;
+    }
+    
+    // Handle high scores screen
+    if (gameOver && showHighScores) {
+        if (e.code == "Space" || e.code == "ArrowUp" || e.code == "KeyX" || e.type == "touchstart" || e.type == "click") {
+            resetGame();
         }
         return;
     }
@@ -332,8 +362,8 @@ function moveBird(e) {
 
         //reset game
         if (gameOver && !showNameInput) {
-            // Check if we should show name input (if score > 0)
-            if (score > 0) {
+            // Check if we should show name input (if score > 0 and not already showing high scores)
+            if (score > 0 && !showHighScores) {
                 showNameInput = true;
                 return;
             } else {
@@ -355,6 +385,7 @@ function resetGame() {
     score = 0;
     gameOver = false;
     showNameInput = false;
+    showHighScores = false;
     playerName = "";
     velocityY = 0;
     //restart music
