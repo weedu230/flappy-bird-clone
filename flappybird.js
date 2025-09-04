@@ -1,4 +1,3 @@
-
 //board
 let board;
 let boardWidth = 360;
@@ -49,10 +48,6 @@ window.onload = function() {
     board.width = boardWidth;
     context = board.getContext("2d"); //used for drawing on the board
 
-    //draw flappy bird
-    // context.fillStyle = "green";
-    // context.fillRect(bird.x, bird.y, bird.width, bird.height);
-
     //load images
     birdImg = new Image();
     birdImg.src = "./flappybird.png";
@@ -83,14 +78,20 @@ window.onload = function() {
 }
 
 function loadHighScores() {
-    const saved = localStorage.getItem('flappyBirdScores');
+    const saved = localStorage.getItem('flappyBirdHighScores');
     if (saved) {
-        highScores = JSON.parse(saved);
+        try {
+            highScores = JSON.parse(saved);
+        } catch (e) {
+            highScores = [];
+        }
+    } else {
+        highScores = [];
     }
 }
 
 function saveHighScores() {
-    localStorage.setItem('flappyBirdScores', JSON.stringify(highScores));
+    localStorage.setItem('flappyBirdHighScores', JSON.stringify(highScores));
 }
 
 function addHighScore(name, score) {
@@ -103,14 +104,19 @@ function addHighScore(name, score) {
 
 function update() {
     requestAnimationFrame(update);
-    if (gameOver && !showNameInput) {
+    if (gameOver && showNameInput) {
+        drawNameInputScreen();
         return;
     }
+    if (gameOver) {
+        drawGameOverScreen();
+        return;
+    }
+    
     context.clearRect(0, 0, board.width, board.height);
 
     //bird
     velocityY += gravity;
-    // bird.y += velocityY;
     bird.y = Math.max(bird.y + velocityY, 0); //apply gravity to current bird.y, limit the bird.y to top of the canvas
     context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
 
@@ -153,88 +159,113 @@ function update() {
     context.font="bold 48px Arial";
     context.strokeText(score, 10, 80);
     context.fillText(score, 10, 80);
+}
 
-    if (gameOver) {
-        if (showNameInput) {
-            // Show name input screen
-            context.fillStyle = "rgba(0, 0, 0, 0.8)";
-            context.fillRect(0, 0, boardWidth, boardHeight);
-            
-            context.fillStyle = "white";
-            context.font = "bold 24px Arial";
-            let namePromptText = "Enter Your Name:";
-            let namePromptWidth = context.measureText(namePromptText).width;
-            let namePromptX = (boardWidth - namePromptWidth) / 2;
-            context.strokeText(namePromptText, namePromptX, boardHeight/2 - 60);
-            context.fillText(namePromptText, namePromptX, boardHeight/2 - 60);
-            
-            // Draw input box
-            context.strokeStyle = "white";
-            context.lineWidth = 2;
-            context.strokeRect(boardWidth/2 - 80, boardHeight/2 - 30, 160, 40);
-            
-            // Draw current input text
-            context.fillStyle = "white";
-            context.font = "20px Arial";
-            context.fillText(playerName, boardWidth/2 - 75, boardHeight/2 - 5);
-            
-            // Instructions
-            context.font = "16px Arial";
-            let instructText = "Press ENTER to save score";
-            let instructWidth = context.measureText(instructText).width;
-            let instructX = (boardWidth - instructWidth) / 2;
-            context.fillText(instructText, instructX, boardHeight/2 + 60);
-            
-        } else {
-        // Game over text with better positioning
-        context.font="bold 36px Arial";
-        let gameOverText = "GAME OVER";
-        let textWidth = context.measureText(gameOverText).width;
-        let x = (boardWidth - textWidth) / 2;
-        
-        context.strokeText(gameOverText, x, boardHeight/2 - 50);
-        context.fillText(gameOverText, x, boardHeight/2 - 50);
-        
-        // Restart instruction
-        context.font="bold 20px Arial";
-        let restartText = "TAP TO RESTART";
-        let restartWidth = context.measureText(restartText).width;
-        let restartX = (boardWidth - restartWidth) / 2;
-        
-        context.strokeText(restartText, restartX, boardHeight/2);
-        context.fillText(restartText, restartX, boardHeight/2);
-        
-        // Final score display
-        context.font="bold 24px Arial";
-        let finalScoreText = "FINAL SCORE: " + score;
-        let finalScoreWidth = context.measureText(finalScoreText).width;
-        let finalScoreX = (boardWidth - finalScoreWidth) / 2;
-        
-        context.strokeText(finalScoreText, finalScoreX, boardHeight/2 + 40);
-        context.fillText(finalScoreText, finalScoreX, boardHeight/2 + 40);
-        }
-    }
+function drawNameInputScreen() {
+    context.clearRect(0, 0, board.width, board.height);
     
-    // Display high scores if game is over and not showing name input
-    if (gameOver && !showNameInput && highScores.length > 0) {
+    // Semi-transparent overlay
+    context.fillStyle = "rgba(0, 0, 0, 0.8)";
+    context.fillRect(0, 0, boardWidth, boardHeight);
+    
+    // Title
+    context.fillStyle = "white";
+    context.font = "bold 28px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 2;
+    let titleText = "NEW HIGH SCORE!";
+    let titleWidth = context.measureText(titleText).width;
+    let titleX = (boardWidth - titleWidth) / 2;
+    context.strokeText(titleText, titleX, boardHeight/2 - 100);
+    context.fillText(titleText, titleX, boardHeight/2 - 100);
+    
+    // Score display
+    context.font = "bold 24px Arial";
+    let scoreText = "Score: " + score;
+    let scoreWidth = context.measureText(scoreText).width;
+    let scoreX = (boardWidth - scoreWidth) / 2;
+    context.strokeText(scoreText, scoreX, boardHeight/2 - 60);
+    context.fillText(scoreText, scoreX, boardHeight/2 - 60);
+    
+    // Name prompt
+    context.font = "bold 20px Arial";
+    let namePromptText = "Enter Your Name:";
+    let namePromptWidth = context.measureText(namePromptText).width;
+    let namePromptX = (boardWidth - namePromptWidth) / 2;
+    context.strokeText(namePromptText, namePromptX, boardHeight/2 - 20);
+    context.fillText(namePromptText, namePromptX, boardHeight/2 - 20);
+    
+    // Input box
+    context.strokeStyle = "white";
+    context.lineWidth = 2;
+    context.strokeRect(boardWidth/2 - 100, boardHeight/2 + 10, 200, 40);
+    
+    // Current input text
+    context.fillStyle = "white";
+    context.font = "18px Arial";
+    let textX = boardWidth/2 - 95;
+    context.fillText(playerName + "|", textX, boardHeight/2 + 35);
+    
+    // Instructions
+    context.font = "16px Arial";
+    context.fillStyle = "yellow";
+    let instructText = "Press ENTER to save";
+    let instructWidth = context.measureText(instructText).width;
+    let instructX = (boardWidth - instructWidth) / 2;
+    context.fillText(instructText, instructX, boardHeight/2 + 80);
+}
+
+function drawGameOverScreen() {
+    context.clearRect(0, 0, board.width, board.height);
+    
+    // Game over text
+    context.fillStyle = "white";
+    context.font="bold 36px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 3;
+    let gameOverText = "GAME OVER";
+    let textWidth = context.measureText(gameOverText).width;
+    let x = (boardWidth - textWidth) / 2;
+    
+    context.strokeText(gameOverText, x, boardHeight/2 - 80);
+    context.fillText(gameOverText, x, boardHeight/2 - 80);
+    
+    // Final score display
+    context.font="bold 24px Arial";
+    let finalScoreText = "FINAL SCORE: " + score;
+    let finalScoreWidth = context.measureText(finalScoreText).width;
+    let finalScoreX = (boardWidth - finalScoreWidth) / 2;
+    
+    context.strokeText(finalScoreText, finalScoreX, boardHeight/2 - 40);
+    context.fillText(finalScoreText, finalScoreX, boardHeight/2 - 40);
+    
+    // Restart instruction
+    context.font="bold 18px Arial";
+    let restartText = "TAP TO RESTART";
+    let restartWidth = context.measureText(restartText).width;
+    let restartX = (boardWidth - restartWidth) / 2;
+    
+    context.strokeText(restartText, restartX, boardHeight/2);
+    context.fillText(restartText, restartX, boardHeight/2);
+    
+    // Display high scores
+    if (highScores.length > 0) {
         context.fillStyle = "white";
-        context.font = "bold 18px Arial";
-        context.strokeStyle = "black";
-        context.lineWidth = 2;
+        context.font = "bold 20px Arial";
         
         let highScoreTitle = "HIGH SCORES";
         let titleWidth = context.measureText(highScoreTitle).width;
         let titleX = (boardWidth - titleWidth) / 2;
-        context.strokeText(highScoreTitle, titleX, boardHeight/2 + 100);
-        context.fillText(highScoreTitle, titleX, boardHeight/2 + 100);
+        context.strokeText(highScoreTitle, titleX, boardHeight/2 + 60);
+        context.fillText(highScoreTitle, titleX, boardHeight/2 + 60);
         
-        context.font = "14px Arial";
+        context.font = "16px Arial";
         for (let i = 0; i < Math.min(5, highScores.length); i++) {
             let scoreEntry = `${i + 1}. ${highScores[i].name}: ${highScores[i].score}`;
             let entryWidth = context.measureText(scoreEntry).width;
             let entryX = (boardWidth - entryWidth) / 2;
-            context.strokeText(scoreEntry, entryX, boardHeight/2 + 130 + (i * 20));
-            context.fillText(scoreEntry, entryX, boardHeight/2 + 130 + (i * 20));
+            context.strokeText(scoreEntry, entryX, boardHeight/2 + 90 + (i * 25));
+            context.fillText(scoreEntry, entryX, boardHeight/2 + 90 + (i * 25));
         }
     }
 }
@@ -244,9 +275,6 @@ function placePipes() {
         return;
     }
 
-    //(0-1) * pipeHeight/2.
-    // 0 -> -128 (pipeHeight/4)
-    // 1 -> -128 - 256 (pipeHeight/4 - pipeHeight/2) = -3/4 pipeHeight
     let randomPipeY = pipeY - pipeHeight/4 - Math.random()*(pipeHeight/2);
     let openingSpace = board.height/4;
 
@@ -272,19 +300,22 @@ function placePipes() {
 }
 
 function moveBird(e) {
-    // Handle name input when game is over
+    // Handle name input when showing name input screen
     if (gameOver && showNameInput) {
         if (e.type === "keydown") {
-            if (e.code === "Enter") {
+            if (e.code === "Enter" || e.key === "Enter") {
                 if (playerName.trim() !== "") {
                     addHighScore(playerName.trim(), score);
                     showNameInput = false;
                     playerName = "";
                 }
-            } else if (e.code === "Backspace") {
+            } else if (e.code === "Backspace" || e.key === "Backspace") {
                 playerName = playerName.slice(0, -1);
-            } else if (e.key.length === 1 && playerName.length < 12) {
-                playerName += e.key;
+            } else if (e.key && e.key.length === 1 && playerName.length < 12) {
+                // Only add printable characters
+                if (e.key.match(/[a-zA-Z0-9\s]/)) {
+                    playerName += e.key;
+                }
             }
         }
         return;
@@ -300,20 +331,15 @@ function moveBird(e) {
         velocityY = -6;
 
         //reset game
-        if (gameOver) {
-            if (!showNameInput && score > 0) {
+        if (gameOver && !showNameInput) {
+            // Check if we should show name input (if score > 0)
+            if (score > 0) {
                 showNameInput = true;
                 return;
+            } else {
+                // No score, just restart
+                resetGame();
             }
-            bird.y = birdY;
-            pipeArray = [];
-            score = 0;
-            gameOver = false;
-            showNameInput = false;
-            playerName = "";
-            //restart music
-            bgMusic.currentTime = 0;
-            bgMusic.play().catch(e => console.log("Audio play failed:", e));
         }
     }
     
@@ -321,6 +347,19 @@ function moveBird(e) {
     if (e.type == "touchstart") {
         e.preventDefault();
     }
+}
+
+function resetGame() {
+    bird.y = birdY;
+    pipeArray = [];
+    score = 0;
+    gameOver = false;
+    showNameInput = false;
+    playerName = "";
+    velocityY = 0;
+    //restart music
+    bgMusic.currentTime = 0;
+    bgMusic.play().catch(e => console.log("Audio play failed:", e));
 }
 
 function detectCollision(a, b) {
