@@ -36,6 +36,9 @@ let gravity = 0.4;
 
 let gameOver = false;
 let score = 0;
+let showNameInput = false;
+let playerName = "";
+let highScores = [];
 
 //audio
 let bgMusic;
@@ -74,11 +77,33 @@ window.onload = function() {
     document.addEventListener("keydown", moveBird);
     document.addEventListener("touchstart", moveBird);
     document.addEventListener("click", moveBird);
+    
+    // Load high scores from localStorage
+    loadHighScores();
+}
+
+function loadHighScores() {
+    const saved = localStorage.getItem('flappyBirdScores');
+    if (saved) {
+        highScores = JSON.parse(saved);
+    }
+}
+
+function saveHighScores() {
+    localStorage.setItem('flappyBirdScores', JSON.stringify(highScores));
+}
+
+function addHighScore(name, score) {
+    highScores.push({ name: name, score: score });
+    // Sort by score (highest first) and keep only top 10
+    highScores.sort((a, b) => b.score - a.score);
+    highScores = highScores.slice(0, 10);
+    saveHighScores();
 }
 
 function update() {
     requestAnimationFrame(update);
-    if (gameOver) {
+    if (gameOver && !showNameInput) {
         return;
     }
     context.clearRect(0, 0, board.width, board.height);
@@ -130,6 +155,37 @@ function update() {
     context.fillText(score, 10, 80);
 
     if (gameOver) {
+        if (showNameInput) {
+            // Show name input screen
+            context.fillStyle = "rgba(0, 0, 0, 0.8)";
+            context.fillRect(0, 0, boardWidth, boardHeight);
+            
+            context.fillStyle = "white";
+            context.font = "bold 24px Arial";
+            let namePromptText = "Enter Your Name:";
+            let namePromptWidth = context.measureText(namePromptText).width;
+            let namePromptX = (boardWidth - namePromptWidth) / 2;
+            context.strokeText(namePromptText, namePromptX, boardHeight/2 - 60);
+            context.fillText(namePromptText, namePromptX, boardHeight/2 - 60);
+            
+            // Draw input box
+            context.strokeStyle = "white";
+            context.lineWidth = 2;
+            context.strokeRect(boardWidth/2 - 80, boardHeight/2 - 30, 160, 40);
+            
+            // Draw current input text
+            context.fillStyle = "white";
+            context.font = "20px Arial";
+            context.fillText(playerName, boardWidth/2 - 75, boardHeight/2 - 5);
+            
+            // Instructions
+            context.font = "16px Arial";
+            let instructText = "Press ENTER to save score";
+            let instructWidth = context.measureText(instructText).width;
+            let instructX = (boardWidth - instructWidth) / 2;
+            context.fillText(instructText, instructX, boardHeight/2 + 60);
+            
+        } else {
         // Game over text with better positioning
         context.font="bold 36px Arial";
         let gameOverText = "GAME OVER";
@@ -156,6 +212,30 @@ function update() {
         
         context.strokeText(finalScoreText, finalScoreX, boardHeight/2 + 40);
         context.fillText(finalScoreText, finalScoreX, boardHeight/2 + 40);
+        }
+    }
+    
+    // Display high scores if game is over and not showing name input
+    if (gameOver && !showNameInput && highScores.length > 0) {
+        context.fillStyle = "white";
+        context.font = "bold 18px Arial";
+        context.strokeStyle = "black";
+        context.lineWidth = 2;
+        
+        let highScoreTitle = "HIGH SCORES";
+        let titleWidth = context.measureText(highScoreTitle).width;
+        let titleX = (boardWidth - titleWidth) / 2;
+        context.strokeText(highScoreTitle, titleX, boardHeight/2 + 100);
+        context.fillText(highScoreTitle, titleX, boardHeight/2 + 100);
+        
+        context.font = "14px Arial";
+        for (let i = 0; i < Math.min(5, highScores.length); i++) {
+            let scoreEntry = `${i + 1}. ${highScores[i].name}: ${highScores[i].score}`;
+            let entryWidth = context.measureText(scoreEntry).width;
+            let entryX = (boardWidth - entryWidth) / 2;
+            context.strokeText(scoreEntry, entryX, boardHeight/2 + 130 + (i * 20));
+            context.fillText(scoreEntry, entryX, boardHeight/2 + 130 + (i * 20));
+        }
     }
 }
 
@@ -192,6 +272,24 @@ function placePipes() {
 }
 
 function moveBird(e) {
+    // Handle name input when game is over
+    if (gameOver && showNameInput) {
+        if (e.type === "keydown") {
+            if (e.code === "Enter") {
+                if (playerName.trim() !== "") {
+                    addHighScore(playerName.trim(), score);
+                    showNameInput = false;
+                    playerName = "";
+                }
+            } else if (e.code === "Backspace") {
+                playerName = playerName.slice(0, -1);
+            } else if (e.key.length === 1 && playerName.length < 12) {
+                playerName += e.key;
+            }
+        }
+        return;
+    }
+    
     if (e.code == "Space" || e.code == "ArrowUp" || e.code == "KeyX" || e.type == "touchstart" || e.type == "click") {
         //start music on first interaction (required by browsers)
         if (bgMusic.paused) {
@@ -203,10 +301,16 @@ function moveBird(e) {
 
         //reset game
         if (gameOver) {
+            if (!showNameInput && score > 0) {
+                showNameInput = true;
+                return;
+            }
             bird.y = birdY;
             pipeArray = [];
             score = 0;
             gameOver = false;
+            showNameInput = false;
+            playerName = "";
             //restart music
             bgMusic.currentTime = 0;
             bgMusic.play().catch(e => console.log("Audio play failed:", e));
