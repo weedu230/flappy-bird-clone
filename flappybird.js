@@ -177,18 +177,29 @@ function update() {
 }
 
 function drawLeaderboardButton() {
-    // Button background
-    context.fillStyle = "rgba(255, 255, 255, 0.9)";
+    // Button background with gradient
+    let gradient = context.createLinearGradient(boardWidth - 120, 10, boardWidth - 10, 45);
+    gradient.addColorStop(0, "#4CAF50");
+    gradient.addColorStop(1, "#45a049");
+    context.fillStyle = gradient;
     context.fillRect(boardWidth - 120, 10, 110, 35);
     
-    // Button border
-    context.strokeStyle = "black";
-    context.lineWidth = 2;
+    // Button border with shadow effect
+    context.strokeStyle = "#2E7D32";
+    context.lineWidth = 3;
     context.strokeRect(boardWidth - 120, 10, 110, 35);
     
+    // Inner highlight
+    context.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    context.lineWidth = 1;
+    context.strokeRect(boardWidth - 118, 12, 106, 31);
+    
     // Button text
-    context.fillStyle = "black";
-    context.font = "bold 14px Arial";
+    context.fillStyle = "white";
+    context.font = "bold 12px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 1;
+    context.strokeText("LEADERBOARD", boardWidth - 115, 30);
     context.fillText("LEADERBOARD", boardWidth - 115, 30);
 }
 
@@ -396,14 +407,23 @@ function placePipes() {
         return;
     }
 
-    // Improved pipe algorithm - ensures gap is always passable
-    let minGapFromTop = 80; // Minimum distance from top
-    let minGapFromBottom = 80; // Minimum distance from bottom
-    let gapSize = 160; // Fixed gap size that's always passable
+    // Much improved pipe algorithm - ensures gap is ALWAYS passable
+    let minGapFromTop = 100; // Minimum distance from top
+    let minGapFromBottom = 100; // Minimum distance from bottom
+    let gapSize = 180; // Larger gap size that's definitely passable
     
     // Calculate safe range for top pipe
     let maxTopPipeHeight = boardHeight - gapSize - minGapFromBottom;
     let minTopPipeHeight = minGapFromTop;
+    
+    // Ensure we have a valid range
+    if (maxTopPipeHeight <= minTopPipeHeight) {
+        // Fallback to center if calculation fails
+        let topPipeHeight = boardHeight / 2 - gapSize / 2;
+    } else {
+        // Random position within safe range
+        let topPipeHeight = minTopPipeHeight + Math.random() * (maxTopPipeHeight - minTopPipeHeight);
+    }
     
     // Random position within safe range
     let topPipeHeight = minTopPipeHeight + Math.random() * (maxTopPipeHeight - minTopPipeHeight);
@@ -498,15 +518,16 @@ function moveBird(e) {
         velocityY = -6;
 
         //reset game
-        if (gameOver && !showNameInput) {
+        if (gameOver && !showNameInput && !showHighScores) {
             // Check if we should show name input (if score > 0 and not already showing high scores)
-            if (score > 0 && !showHighScores) {
+            if (score > 0) {
                 showNameInput = true;
                 return;
-            } else {
-                // No score, just restart
+            } else if (score === 0) {
+                // No score earned, just restart the game
                 resetGame();
             }
+            return;
         }
     }
     
