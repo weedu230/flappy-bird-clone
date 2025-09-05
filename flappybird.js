@@ -37,6 +37,7 @@ let gameOver = false;
 let score = 0;
 let showNameInput = false;
 let showHighScores = false;
+let showLeaderboard = false;
 let playerName = "";
 let highScores = [];
 
@@ -105,6 +106,10 @@ function addHighScore(name, score) {
 
 function update() {
     requestAnimationFrame(update);
+    if (showLeaderboard) {
+        drawLeaderboardScreen();
+        return;
+    }
     if (gameOver && showNameInput) {
         drawNameInputScreen();
         return;
@@ -164,6 +169,101 @@ function update() {
     context.font="bold 48px Arial";
     context.strokeText(score, 10, 80);
     context.fillText(score, 10, 80);
+    
+    // Draw leaderboard button (only when game is active)
+    if (!gameOver) {
+        drawLeaderboardButton();
+    }
+}
+
+function drawLeaderboardButton() {
+    // Button background
+    context.fillStyle = "rgba(255, 255, 255, 0.9)";
+    context.fillRect(boardWidth - 120, 10, 110, 35);
+    
+    // Button border
+    context.strokeStyle = "black";
+    context.lineWidth = 2;
+    context.strokeRect(boardWidth - 120, 10, 110, 35);
+    
+    // Button text
+    context.fillStyle = "black";
+    context.font = "bold 14px Arial";
+    context.fillText("LEADERBOARD", boardWidth - 115, 30);
+}
+
+function isClickOnLeaderboardButton(x, y) {
+    return x >= boardWidth - 120 && x <= boardWidth - 10 && 
+           y >= 10 && y <= 45;
+}
+
+function drawLeaderboardScreen() {
+    context.clearRect(0, 0, board.width, board.height);
+    
+    // Gradient background
+    let gradient = context.createLinearGradient(0, 0, 0, boardHeight);
+    gradient.addColorStop(0, "#1e3c72");
+    gradient.addColorStop(1, "#2a5298");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, boardWidth, boardHeight);
+    
+    // Title with trophy
+    context.fillStyle = "#FFD700";
+    context.font = "bold 28px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 2;
+    let titleText = "🏆 LEADERBOARD 🏆";
+    let titleWidth = context.measureText(titleText).width;
+    let titleX = (boardWidth - titleWidth) / 2;
+    context.strokeText(titleText, titleX, 60);
+    context.fillText(titleText, titleX, 60);
+    
+    if (highScores.length === 0) {
+        context.fillStyle = "white";
+        context.font = "20px Arial";
+        let noScoresText = "No scores yet!";
+        let noScoresWidth = context.measureText(noScoresText).width;
+        let noScoresX = (boardWidth - noScoresWidth) / 2;
+        context.fillText(noScoresText, noScoresX, boardHeight/2);
+    } else {
+        // Display high scores
+        context.font = "18px Arial";
+        for (let i = 0; i < Math.min(10, highScores.length); i++) {
+            // Special styling for top 3
+            if (i < 3) {
+                context.fillStyle = "#FFD700"; // Gold for top 3
+                context.strokeStyle = "black";
+                context.lineWidth = 1;
+            } else {
+                context.fillStyle = "white";
+                context.strokeStyle = "black";
+                context.lineWidth = 1;
+            }
+            
+            let rank = i + 1;
+            let scoreEntry = `#${rank}  ${highScores[i].name}  -  ${highScores[i].score}`;
+            let entryWidth = context.measureText(scoreEntry).width;
+            let entryX = (boardWidth - entryWidth) / 2;
+            let entryY = 120 + (i * 35);
+            
+            context.strokeText(scoreEntry, entryX, entryY);
+            context.fillText(scoreEntry, entryX, entryY);
+        }
+    }
+    
+    // Back button
+    context.fillStyle = "rgba(255, 255, 255, 0.9)";
+    context.fillRect(boardWidth/2 - 60, boardHeight - 80, 120, 40);
+    context.strokeStyle = "black";
+    context.lineWidth = 2;
+    context.strokeRect(boardWidth/2 - 60, boardHeight - 80, 120, 40);
+    
+    context.fillStyle = "black";
+    context.font = "bold 16px Arial";
+    let backText = "BACK TO GAME";
+    let backWidth = context.measureText(backText).width;
+    let backX = (boardWidth - backWidth) / 2;
+    context.fillText(backText, backX, boardHeight - 55);
 }
 
 function drawNameInputScreen() {
@@ -296,8 +396,20 @@ function placePipes() {
         return;
     }
 
-    let randomPipeY = pipeY - pipeHeight/4 - Math.random()*(pipeHeight/2);
-    let openingSpace = board.height/4;
+    // Improved pipe algorithm - ensures gap is always passable
+    let minGapFromTop = 80; // Minimum distance from top
+    let minGapFromBottom = 80; // Minimum distance from bottom
+    let gapSize = 160; // Fixed gap size that's always passable
+    
+    // Calculate safe range for top pipe
+    let maxTopPipeHeight = boardHeight - gapSize - minGapFromBottom;
+    let minTopPipeHeight = minGapFromTop;
+    
+    // Random position within safe range
+    let topPipeHeight = minTopPipeHeight + Math.random() * (maxTopPipeHeight - minTopPipeHeight);
+    
+    // Top pipe (extends from top down)
+    let randomPipeY = topPipeHeight - pipeHeight;
 
     let topPipe = {
         img : topPipeImg,
@@ -309,10 +421,11 @@ function placePipes() {
     }
     pipeArray.push(topPipe);
 
+    // Bottom pipe (starts after the gap)
     let bottomPipe = {
         img : bottomPipeImg,
         x : pipeX,
-        y : randomPipeY + pipeHeight + openingSpace,
+        y : topPipeHeight + gapSize,
         width : pipeWidth,
         height : pipeHeight,
         passed : false
@@ -321,6 +434,30 @@ function placePipes() {
 }
 
 function moveBird(e) {
+    // Handle leaderboard screen
+    if (showLeaderboard) {
+        if (e.code == "Space" || e.code == "Escape" || e.type == "touchstart" || e.type == "click") {
+            showLeaderboard = false;
+        }
+        return;
+    }
+    
+    // Handle leaderboard button click during gameplay
+    if (!gameOver && (e.type == "click" || e.type == "touchstart")) {
+        let rect = board.getBoundingClientRect();
+        let clickX = (e.clientX || e.touches[0].clientX) - rect.left;
+        let clickY = (e.clientY || e.touches[0].clientY) - rect.top;
+        
+        // Scale coordinates to canvas size
+        clickX = clickX * (boardWidth / rect.width);
+        clickY = clickY * (boardHeight / rect.height);
+        
+        if (isClickOnLeaderboardButton(clickX, clickY)) {
+            showLeaderboard = true;
+            return;
+        }
+    }
+    
     // Handle name input when showing name input screen
     if (gameOver && showNameInput) {
         if (e.type === "keydown") {
@@ -386,6 +523,7 @@ function resetGame() {
     gameOver = false;
     showNameInput = false;
     showHighScores = false;
+    showLeaderboard = false;
     playerName = "";
     velocityY = 0;
     //restart music
