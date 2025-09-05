@@ -40,6 +40,7 @@ let showHighScores = false;
 let showLeaderboard = false;
 let playerName = "";
 let highScores = [];
+let isLoadingScores = false;
 
 //audio
 let bgMusic;
@@ -77,6 +78,39 @@ window.onload = function() {
     
     // Load high scores from localStorage
     loadHighScores();
+    
+    // Also load from database
+    loadHighScoresFromDatabase();
+}
+
+// Import database functions
+async function loadHighScoresFromDatabase() {
+    try {
+        // Dynamic import to handle module loading
+        const { getHighScores } = await import('./src/database.js');
+        const dbScores = await getHighScores();
+        
+        // Merge with local scores and remove duplicates
+        const allScores = [...highScores, ...dbScores];
+        const uniqueScores = allScores.reduce((acc, current) => {
+            const existing = acc.find(item => 
+                item.player_name === current.player_name && item.score === current.score
+            );
+            if (!existing) {
+                acc.push({
+                    name: current.player_name || current.name,
+                    score: current.score
+                });
+            }
+            return acc;
+        }, []);
+        
+        // Sort and keep top 10
+        highScores = uniqueScores.sort((a, b) => b.score - a.score).slice(0, 10);
+        saveHighScores(); // Update localStorage
+    } catch (error) {
+        console.log('Database not available, using local storage only');
+    }
 }
 
 function loadHighScores() {
@@ -96,12 +130,24 @@ function saveHighScores() {
     localStorage.setItem('flappyBirdHighScores', JSON.stringify(highScores));
 }
 
-function addHighScore(name, score) {
+async function addHighScore(name, score) {
+    // Save to database first
+    try {
+        const { saveHighScore } = await import('./src/database.js');
+        await saveHighScore(name, score);
+    } catch (error) {
+        console.log('Could not save to database, saving locally only');
+    }
+    
+    // Save locally
     highScores.push({ name: name, score: score });
     // Sort by score (highest first) and keep only top 10
     highScores.sort((a, b) => b.score - a.score);
     highScores = highScores.slice(0, 10);
     saveHighScores();
+    
+    // Reload from database to get latest scores
+    await loadHighScoresFromDatabase();
 }
 
 function update() {
@@ -400,6 +446,44 @@ function drawGameOverScreen() {
     
     context.strokeText(restartText, restartX, boardHeight/2);
     context.fillText(restartText, restartX, boardHeight/2);
+    
+    // Add leaderboard button on game over screen
+    drawGameOverLeaderboardButton();
+}
+
+function drawGameOverLeaderboardButton() {
+    // Button background with gradient
+    let gradient = context.createLinearGradient(boardWidth/2 - 60, boardHeight/2 + 40, boardWidth/2 + 60, boardHeight/2 + 80);
+    gradient.addColorStop(0, "#FF6B35");
+    gradient.addColorStop(1, "#F7931E");
+    context.fillStyle = gradient;
+    context.fillRect(boardWidth/2 - 60, boardHeight/2 + 40, 120, 40);
+    
+    // Button border with shadow effect
+    context.strokeStyle = "#D2691E";
+    context.lineWidth = 3;
+    context.strokeRect(boardWidth/2 - 60, boardHeight/2 + 40, 120, 40);
+    
+    // Inner highlight
+    context.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    context.lineWidth = 1;
+    context.strokeRect(boardWidth/2 - 58, boardHeight/2 + 42, 116, 36);
+    
+    // Button text
+    context.fillStyle = "white";
+    context.font = "bold 14px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 1;
+    let buttonText = "VIEW LEADERBOARD";
+    let buttonWidth = context.measureText(buttonText).width;
+    let buttonX = (boardWidth - buttonWidth) / 2;
+    context.strokeText(buttonText, buttonX, boardHeight/2 + 65);
+    context.fillText(buttonText, buttonX, boardHeight/2 + 65);
+}
+
+function isClickOnGameOverLeaderboardButton(x, y) {
+    return x >= boardWidth/2 - 60 && x <= boardWidth/2 + 60 && 
+           y >= boardHeight/2 + 40 && y <= boardHeight/2 + 80;
 }
 
 function placePipes() {
@@ -478,12 +562,31 @@ function moveBird(e) {
         }
     }
     
+    // Handle leaderboard button click on game over screen
+    if (gameOver && !showNameInput && !showHighScores && (e.type == "click" || e.type == "touchstart")) {
+        let rect = board.getBoundingClientRect();
+        let clickX = (e.clientX || e.touches[0].clientX) - rect.left;
+        let clickY = (e.clientY || e.touches[0].clientY) - rect.top;
+        
+        // Scale coordinates to canvas size
+        clickX = clickX * (boardWidth / rect.width);
+        clickY = clickY * (boardHeight / rect.height);
+        
+        if (isClickOnGameOverLeaderboardButton(clickX, clickY)) {
+            showLeaderboard = true;
+            return;
+        }
+    }
+    
     // Handle name input when showing name input screen
     if (gameOver && showNameInput) {
         if (e.type === "keydown") {
             if (e.code === "Enter" || e.key === "Enter") {
                 if (playerName.trim() !== "") {
-                    addHighScore(playerName.trim(), score);
+                    isLoadingScores = true;
+                    addHighScore(playerName.trim(), score).then(() => {
+                        isLoadingScores = false;
+                    });
                     playerName = "";
                     showNameInput = false;
                     showHighScores = true;

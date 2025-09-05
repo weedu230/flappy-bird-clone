@@ -8,7 +8,15 @@
     "build": "echo 'No build step needed for static HTML game'",
     "preview": "npx --yes serve -s . -l 4173"
   },
-  "keywords": ["flappy-bird", "game", "html5", "canvas"],
+  "keywords": [
+    "flappy-bird",
+    "game",
+    "html5",
+    "canvas"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.0"
+  }
 }
