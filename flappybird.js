@@ -48,19 +48,30 @@ window.onload = function() {
     board.width = boardWidth;
     context = board.getContext("2d");
 
-    // Load images
+    // Initialize game state
+    bird.x = birdX;
+    bird.y = birdY;
+    
+    // Load images with error handling
     birdImg = new Image();
     birdImg.src = "./flappybird.png";
-    birdImg.onload = function() {
-        context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
-    }
+    birdImg.onerror = function() {
+        console.error("Failed to load bird image");
+    };
 
     topPipeImg = new Image();
     topPipeImg.src = "./toppipe.png";
+    topPipeImg.onerror = function() {
+        console.error("Failed to load top pipe image");
+    };
 
     bottomPipeImg = new Image();
     bottomPipeImg.src = "./bottompipe.png";
+    bottomPipeImg.onerror = function() {
+        console.error("Failed to load bottom pipe image");
+    };
 
+    // Start the game loop
     requestAnimationFrame(update);
     setInterval(placePipes, 1500);
     document.addEventListener("keydown", moveBird);
@@ -91,7 +102,15 @@ function update() {
     // Bird
     velocityY += gravity;
     bird.y = Math.max(bird.y + velocityY, 0);
-    context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+    
+    // Draw bird (with fallback if image not loaded)
+    if (birdImg.complete && birdImg.naturalHeight !== 0) {
+        context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+    } else {
+        // Draw a simple rectangle as fallback
+        context.fillStyle = "#FFD700";
+        context.fillRect(bird.x, bird.y, bird.width, bird.height);
+    }
 
     if (bird.y > board.height) {
         gameOver = true;
@@ -101,7 +120,15 @@ function update() {
     for (let i = 0; i < pipeArray.length; i++) {
         let pipe = pipeArray[i];
         pipe.x += velocityX;
-        context.drawImage(pipe.img, pipe.x, pipe.y, pipe.width, pipe.height);
+        
+        // Draw pipe (with fallback if image not loaded)
+        if (pipe.img.complete && pipe.img.naturalHeight !== 0) {
+            context.drawImage(pipe.img, pipe.x, pipe.y, pipe.width, pipe.height);
+        } else {
+            // Draw a simple rectangle as fallback
+            context.fillStyle = pipe.img === topPipeImg ? "#228B22" : "#32CD32";
+            context.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
+        }
 
         if (!pipe.passed && bird.x > pipe.x + pipe.width) {
             score += 0.5;
@@ -124,7 +151,7 @@ function update() {
     context.fillText(score, 10, 45);
 
     // Game over
-    if (gameOver) {
+    if (gameOver || !gameStarted) {
         context.fillStyle = "red";
         context.font = "45px sans-serif";
         context.fillText("GAME OVER", 50, 90);
@@ -161,8 +188,14 @@ function update() {
 function drawStartScreen() {
     context.clearRect(0, 0, board.width, board.height);
     
-    // Draw background bird
-    context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+    // Draw background bird (only if image is loaded)
+    if (birdImg.complete && birdImg.naturalHeight !== 0) {
+        context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+    } else {
+        // Draw a simple rectangle as fallback
+        context.fillStyle = "#FFD700";
+        context.fillRect(bird.x, bird.y, bird.width, bird.height);
+    }
     
     // Semi-transparent overlay
     context.fillStyle = "rgba(0, 0, 0, 0.7)";
