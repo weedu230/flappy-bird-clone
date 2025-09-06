@@ -1,3 +1,5 @@
+import { saveHighScore as saveToDatabase, getHighScores as getFromDatabase } from './src/database.js';
+
 let gameOver = false;
 let gameStarted = false;
 let score = 0;
@@ -5,7 +7,8 @@ let showNameInput = false;
 let showHighScores = false;
 let showLeaderboard = false;
 let playerName = "";
-let highScores = JSON.parse(localStorage.getItem('flappyBirdScores')) || [];
+let highScores = [];
+let databaseConnected = false;
 
 let board;
 let boardWidth = 360;
@@ -36,11 +39,15 @@ let pipeY = 0;
 let topPipeImg;
 let bottomPipeImg;
 
-// Physics
+// Physics (matching pseudocode)
 let velocityX = -2;
 let velocityY = 0;
-let gravity = 0.4;
-let jumpForce = -6;
+let gravity = 1;
+let jumpForce = -12;
+
+// Game settings
+let pipeSpeed = 2;
+let pipeInterval = 1500;
 
 window.onload = function() {
     board = document.getElementById("board");
@@ -52,137 +59,237 @@ window.onload = function() {
     bird.x = birdX;
     bird.y = birdY;
     
+    // Load high scores from localStorage first
+    loadLocalHighScores();
+    
+    // Try to load from database
+    loadDatabaseHighScores();
+    
     // Load images with error handling
     birdImg = new Image();
     birdImg.src = "./flappybird.png";
     birdImg.onerror = function() {
-        console.error("Failed to load bird image");
+        console.warn("Bird image not found, using fallback graphics");
     };
 
     topPipeImg = new Image();
     topPipeImg.src = "./toppipe.png";
     topPipeImg.onerror = function() {
-        console.error("Failed to load top pipe image");
+        console.warn("Top pipe image not found, using fallback graphics");
     };
 
     bottomPipeImg = new Image();
     bottomPipeImg.src = "./bottompipe.png";
     bottomPipeImg.onerror = function() {
-        console.error("Failed to load bottom pipe image");
+        console.warn("Bottom pipe image not found, using fallback graphics");
     };
 
     // Start the game loop
     requestAnimationFrame(update);
-    setInterval(placePipes, 1500);
+    setInterval(placePipes, pipeInterval);
+    
+    // Event listeners
     document.addEventListener("keydown", moveBird);
     board.addEventListener("click", moveBird);
-    board.addEventListener("touchstart", moveBird);
+    board.addEventListener("touchstart", handleTouch);
+    
+    // Prevent context menu on right click
+    board.addEventListener("contextmenu", function(e) {
+        e.preventDefault();
+    });
+}
+
+function handleTouch(e) {
+    e.preventDefault(); // Prevent scrolling and zooming
+    moveBird(e);
 }
 
 function update() {
     requestAnimationFrame(update);
+    
     if (!gameStarted) {
         drawStartScreen();
         return;
     }
+    
     if (showLeaderboard) {
         drawLeaderboardScreen();
         return;
     }
+    
     if (showNameInput) {
         drawNameInputScreen();
         return;
     }
+    
     if (showHighScores) {
         drawHighScoresScreen();
         return;
     }
+    
     context.clearRect(0, 0, board.width, board.height);
 
-    // Bird
-    velocityY += gravity;
-    bird.y = Math.max(bird.y + velocityY, 0);
+    // Only update game if not game over
+    if (!gameOver) {
+        // Bird physics
+        velocityY += gravity;
+        bird.y = Math.max(bird.y + velocityY, 0);
+        
+        // Check ground collision
+        if (bird.y > board.height - bird.height) {
+            gameOver = true;
+        }
+    }
     
     // Draw bird (with fallback if image not loaded)
     if (birdImg.complete && birdImg.naturalHeight !== 0) {
         context.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
     } else {
-        // Draw a simple rectangle as fallback
+        // Draw a simple bird shape as fallback
         context.fillStyle = "#FFD700";
         context.fillRect(bird.x, bird.y, bird.width, bird.height);
-    }
-
-    if (bird.y > board.height) {
-        gameOver = true;
+        // Add simple wing
+        context.fillStyle = "#FFA500";
+        context.fillRect(bird.x + 5, bird.y + 5, bird.width - 10, bird.height - 10);
     }
 
     // Pipes
     for (let i = 0; i < pipeArray.length; i++) {
         let pipe = pipeArray[i];
-        pipe.x += velocityX;
+        
+        if (!gameOver) {
+            pipe.x += velocityX;
+        }
         
         // Draw pipe (with fallback if image not loaded)
-        if (pipe.img.complete && pipe.img.naturalHeight !== 0) {
+        if (pipe.img && pipe.img.complete && pipe.img.naturalHeight !== 0) {
             context.drawImage(pipe.img, pipe.x, pipe.y, pipe.width, pipe.height);
         } else {
             // Draw a simple rectangle as fallback
             context.fillStyle = pipe.img === topPipeImg ? "#228B22" : "#32CD32";
             context.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
+            // Add pipe highlight
+            context.fillStyle = pipe.img === topPipeImg ? "#32CD32" : "#90EE90";
+            context.fillRect(pipe.x + 5, pipe.y, 5, pipe.height);
         }
 
-        if (!pipe.passed && bird.x > pipe.x + pipe.width) {
+        // Score when passing pipe
+        if (!gameOver && !pipe.passed && bird.x > pipe.x + pipe.width) {
             score += 0.5;
             pipe.passed = true;
         }
 
-        if (detectCollision(bird, pipe)) {
+        // Collision detection
+        if (!gameOver && detectCollision(bird, pipe)) {
             gameOver = true;
         }
     }
 
-    // Clear pipes
+    // Clear pipes that are off screen
     while (pipeArray.length > 0 && pipeArray[0].x < -pipeWidth) {
         pipeArray.shift();
     }
 
-    // Score
-    context.fillStyle = "white";
-    context.font = "45px sans-serif";
-    context.fillText(score, 10, 45);
-
-    // Game over
-    if (gameOver || !gameStarted) {
-        context.fillStyle = "red";
-        context.font = "45px sans-serif";
-        context.fillText("GAME OVER", 50, 90);
-        
-        // Check if it's a high score
-        if (isHighScore(score)) {
-            showNameInput = true;
-        } else {
-            context.fillStyle = "white";
-            context.font = "20px sans-serif";
-            context.fillText("Press R to restart", 80, 130);
-        }
-    }
+    // Draw score with better styling
+    drawScore();
     
-    // Draw score
+    // Draw leaderboard button (only when game is active and not game over)
+    if (!gameOver && gameStarted) {
+        drawLeaderboardButton();
+    }
+
+    // Game over screen
+    if (gameOver) {
+        drawGameOverScreen();
+    }
+}
+
+function drawScore() {
+    // Score background
+    context.fillStyle = "rgba(0, 0, 0, 0.5)";
+    context.fillRect(5, 5, 100, 50);
+    
+    // Score text
     context.fillStyle = "white";
     context.font = "bold 32px Arial";
     context.strokeStyle = "black";
     context.lineWidth = 2;
-    context.strokeText(score, 10, 50);
-    context.fillText(score, 10, 50);
+    context.strokeText(Math.floor(score), 15, 40);
+    context.fillText(Math.floor(score), 15, 40);
+}
+
+function drawGameOverScreen() {
+    // Semi-transparent overlay
+    context.fillStyle = "rgba(0, 0, 0, 0.8)";
+    context.fillRect(0, 0, boardWidth, boardHeight);
     
-    // Draw current score during gameplay
-    context.fillStyle = "yellow";
-    context.font = "20px Arial";
-    context.fillText("Score: " + score, 10, 80);
+    // Game Over title
+    context.fillStyle = "#FF4444";
+    context.font = "bold 48px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 3;
+    let gameOverText = "GAME OVER";
+    let gameOverWidth = context.measureText(gameOverText).width;
+    let gameOverX = (boardWidth - gameOverWidth) / 2;
+    context.strokeText(gameOverText, gameOverX, boardHeight/2 - 80);
+    context.fillText(gameOverText, gameOverX, boardHeight/2 - 80);
     
-    // Draw leaderboard button (only when game is active)
-    if (!gameOver && gameStarted) {
-        drawLeaderboardButton();
+    // Final score
+    context.fillStyle = "#FFD700";
+    context.font = "bold 32px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 2;
+    let scoreText = "Score: " + Math.floor(score);
+    let scoreWidth = context.measureText(scoreText).width;
+    let scoreX = (boardWidth - scoreWidth) / 2;
+    context.strokeText(scoreText, scoreX, boardHeight/2 - 20);
+    context.fillText(scoreText, scoreX, boardHeight/2 - 20);
+    
+    // Check if it's a high score
+    if (score > 0 && isHighScore(score)) {
+        showNameInput = true;
+        return;
     }
+    
+    // Restart instruction
+    context.fillStyle = "white";
+    context.font = "bold 20px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 1;
+    let restartText = "CLICK TO RESTART";
+    let restartWidth = context.measureText(restartText).width;
+    let restartX = (boardWidth - restartWidth) / 2;
+    context.strokeText(restartText, restartX, boardHeight/2 + 40);
+    context.fillText(restartText, restartX, boardHeight/2 + 40);
+    
+    // Leaderboard button on game over screen
+    drawGameOverLeaderboardButton();
+}
+
+function drawGameOverLeaderboardButton() {
+    // Button background with gradient
+    let gradient = context.createLinearGradient(boardWidth/2 - 80, boardHeight/2 + 70, boardWidth/2 + 80, boardHeight/2 + 110);
+    gradient.addColorStop(0, "#FF8C00");
+    gradient.addColorStop(1, "#FF6347");
+    
+    context.fillStyle = gradient;
+    context.fillRect(boardWidth/2 - 80, boardHeight/2 + 70, 160, 40);
+    
+    // Button border
+    context.strokeStyle = "#CC4125";
+    context.lineWidth = 2;
+    context.strokeRect(boardWidth/2 - 80, boardHeight/2 + 70, 160, 40);
+    
+    // Button text
+    context.fillStyle = "white";
+    context.font = "bold 16px Arial";
+    context.strokeStyle = "black";
+    context.lineWidth = 1;
+    let buttonText = "VIEW LEADERBOARD";
+    let buttonWidth = context.measureText(buttonText).width;
+    let buttonX = (boardWidth - buttonWidth) / 2;
+    context.strokeText(buttonText, buttonX, boardHeight/2 + 95);
+    context.fillText(buttonText, buttonX, boardHeight/2 + 95);
 }
 
 function drawStartScreen() {
@@ -230,6 +337,17 @@ function drawStartScreen() {
     let instructWidth = context.measureText(instructText).width;
     let instructX = (boardWidth - instructWidth) / 2;
     context.fillText(instructText, instructX, boardHeight/2 + 80);
+    
+    // Database status
+    if (databaseConnected) {
+        context.fillStyle = "#4CAF50";
+        context.font = "14px Arial";
+        context.fillText("🌐 Online Leaderboard", 10, boardHeight - 20);
+    } else {
+        context.fillStyle = "#FFA500";
+        context.font = "14px Arial";
+        context.fillText("📱 Local Scores Only", 10, boardHeight - 20);
+    }
     
     // Leaderboard button on start screen
     drawLeaderboardButton();
@@ -287,8 +405,8 @@ function drawLeaderboardScreen() {
     } else {
         for (let i = 0; i < Math.min(10, highScores.length); i++) {
             let rank = i + 1;
-            let name = highScores[i].name;
-            let score = highScores[i].score;
+            let name = highScores[i].player_name || highScores[i].name;
+            let scoreValue = highScores[i].score;
             
             // Rank color
             if (rank === 1) context.fillStyle = "#FFD700"; // Gold
@@ -303,7 +421,7 @@ function drawLeaderboardScreen() {
             context.fillText(name, 60, 120 + i * 35);
             
             // Score aligned to right
-            let scoreText = score.toString();
+            let scoreText = scoreValue.toString();
             let scoreWidth = context.measureText(scoreText).width;
             context.fillText(scoreText, boardWidth - 30 - scoreWidth, 120 + i * 35);
         }
@@ -345,7 +463,7 @@ function drawNameInputScreen() {
     // Score display
     context.fillStyle = "white";
     context.font = "24px Arial";
-    let scoreText = "Score: " + score;
+    let scoreText = "Score: " + Math.floor(score);
     let scoreWidth = context.measureText(scoreText).width;
     let scoreX = (boardWidth - scoreWidth) / 2;
     context.fillText(scoreText, scoreX, 200);
@@ -403,11 +521,11 @@ function drawHighScoresScreen() {
     
     for (let i = 0; i < Math.min(10, highScores.length); i++) {
         let rank = i + 1;
-        let name = highScores[i].name;
+        let name = highScores[i].player_name || highScores[i].name;
         let scoreValue = highScores[i].score;
         
         // Highlight current score
-        if (scoreValue === score && name === playerName) {
+        if (scoreValue === Math.floor(score) && name === playerName) {
             context.fillStyle = "#FFD700";
         } else {
             context.fillStyle = "white";
@@ -437,6 +555,7 @@ function placePipes() {
         return;
     }
 
+    // Simple pipe algorithm (matching pseudocode)
     let randomPipeY = pipeY - pipeHeight/4 - Math.random()*(pipeHeight/2);
     let openingSpace = board.height/4;
 
@@ -515,7 +634,7 @@ function moveBird(e) {
     if (showNameInput) {
         if (e.type == "keydown") {
             if (e.code == "Enter" && playerName.trim() !== "") {
-                saveHighScore(playerName.trim(), score);
+                saveHighScoreToAll(playerName.trim(), Math.floor(score));
                 showNameInput = false;
                 showHighScores = true;
                 return;
@@ -557,6 +676,32 @@ function moveBird(e) {
         return;
     }
     
+    // Handle game over screen
+    if (gameOver) {
+        if (e.type == "click" || e.type == "touchstart") {
+            let rect = board.getBoundingClientRect();
+            let clickX = (e.clientX || e.touches[0].clientX) - rect.left;
+            let clickY = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            // Scale coordinates to canvas size
+            clickX = clickX * (boardWidth / rect.width);
+            clickY = clickY * (boardHeight / rect.height);
+            
+            // Check if clicking leaderboard button on game over screen
+            if (clickX >= boardWidth/2 - 80 && clickX <= boardWidth/2 + 80 &&
+                clickY >= boardHeight/2 + 70 && clickY <= boardHeight/2 + 110) {
+                showLeaderboard = true;
+                return;
+            }
+        }
+        
+        // Restart game
+        if (e.code == "Space" || e.code == "Enter" || e.type == "click" || e.type == "touchstart") {
+            resetGame();
+        }
+        return;
+    }
+    
     // Handle leaderboard button click during gameplay
     if (!gameOver && gameStarted && (e.type == "click" || e.type == "touchstart")) {
         let rect = board.getBoundingClientRect();
@@ -576,15 +721,6 @@ function moveBird(e) {
     // Normal game controls
     if (e.code == "Space" || e.code == "ArrowUp" || e.code == "KeyX" || e.type == "click" || e.type == "touchstart") {
         velocityY = jumpForce;
-
-        if (gameOver) {
-            resetGame();
-        }
-    }
-    
-    // Restart game
-    if (e.code == "KeyR" && gameOver) {
-        resetGame();
     }
 }
 
@@ -603,14 +739,50 @@ function isHighScore(currentScore) {
     if (highScores.length < 10) {
         return true;
     }
-    return currentScore > highScores[highScores.length - 1].score;
+    return Math.floor(currentScore) > highScores[highScores.length - 1].score;
 }
 
-function saveHighScore(name, score) {
-    highScores.push({name: name, score: score});
+function loadLocalHighScores() {
+    try {
+        const localScores = localStorage.getItem('flappyBirdScores');
+        if (localScores) {
+            highScores = JSON.parse(localScores);
+        }
+    } catch (error) {
+        console.warn("Failed to load local high scores:", error);
+        highScores = [];
+    }
+}
+
+async function loadDatabaseHighScores() {
+    try {
+        const dbScores = await getFromDatabase(10);
+        if (dbScores && dbScores.length > 0) {
+            highScores = dbScores;
+            databaseConnected = true;
+        }
+    } catch (error) {
+        console.warn("Database not available, using local storage:", error);
+        databaseConnected = false;
+    }
+}
+
+async function saveHighScoreToAll(name, score) {
+    // Save to local storage
+    const localScore = { name: name, score: score };
+    highScores.push(localScore);
     highScores.sort((a, b) => b.score - a.score);
-    highScores = highScores.slice(0, 10); // Keep only top 10
+    highScores = highScores.slice(0, 10);
     localStorage.setItem('flappyBirdScores', JSON.stringify(highScores));
+    
+    // Try to save to database
+    try {
+        await saveToDatabase(name, score);
+        // Reload from database to get updated list
+        await loadDatabaseHighScores();
+    } catch (error) {
+        console.warn("Failed to save to database:", error);
+    }
 }
 
 function resetGame() {
